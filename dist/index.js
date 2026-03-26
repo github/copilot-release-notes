@@ -29983,26 +29983,10 @@ async function ensureCopilotCLI() {
         // Not found, install it
     }
     core.info('Installing Copilot CLI via npm...');
-    await exec.exec('npm', ['install', '-g', '@anthropic-ai/claude-code'], {
-        silent: true
-    });
-    // The Copilot CLI npm package name may vary — try the known options
-    try {
-        await exec.exec('npm', ['install', '-g', 'github-copilot-cli'], {
-            silent: true
-        });
-    }
-    catch {
-        // Try alternative package name
-        try {
-            await exec.exec('npm', ['install', '-g', '@githubnext/copilot-cli'], {
-                silent: true
-            });
-        }
-        catch {
-            throw new Error('Failed to install Copilot CLI. Please ensure it is available on PATH ' +
-                'or install it manually before running this action.');
-        }
+    const exitCode = await exec.exec('npm', ['install', '-g', '@github/copilot'], { silent: true });
+    if (exitCode !== 0) {
+        throw new Error('Failed to install Copilot CLI. Please ensure Node.js v22+ is available ' +
+            'or install it manually before running this action.');
     }
     const copilotPath = await io.which('copilot', true);
     core.info(`Copilot CLI installed at: ${copilotPath}`);
