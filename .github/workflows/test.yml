@@ -40,13 +40,21 @@ jobs:
       - name: Print release notes
         run: |
           echo "=== Release Notes ==="
-          echo "${{ steps.notes.outputs.release-notes }}"
+          cat <<'RELEASE_NOTES_EOF'
+          ${{ steps.notes.outputs.release-notes }}
+          RELEASE_NOTES_EOF
           echo ""
           echo "=== JSON ==="
-          echo '${{ steps.notes.outputs.release-notes-json }}' | jq .
+          cat <<'JSON_EOF'
+          ${{ steps.notes.outputs.release-notes-json }}
+          JSON_EOF
           echo ""
           echo "=== Skipped PRs ==="
-          echo '${{ steps.notes.outputs.skipped-prs }}' | jq .
+          cat <<'SKIP_EOF'
+          ${{ steps.notes.outputs.skipped-prs }}
+          SKIP_EOF
           echo ""
           echo "=== Uncertain Entries ==="
-          echo '${{ steps.notes.outputs.uncertain-entries }}' | jq .
+          cat <<'UNCERTAIN_EOF'
+          ${{ steps.notes.outputs.uncertain-entries }}
+          UNCERTAIN_EOF
