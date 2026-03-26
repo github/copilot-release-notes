@@ -33,6 +33,11 @@ export declare function parseOutput(stdout: string): ParsedOutput;
  */
 export declare function formatAsMarkdown(output: ParsedOutput): string;
 /**
+ * Sanitize text to prevent GitHub Actions workflow command injection.
+ * Lines starting with :: are interpreted as runner commands.
+ */
+export declare function sanitizeForLog(text: string): string;
+/**
  * Set the GitHub Action outputs.
  */
 export declare function setOutputs(output: ParsedOutput): void;

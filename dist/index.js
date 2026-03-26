@@ -1,4 +1,4 @@
-require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
+/******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
 /***/ 4914:
@@ -30056,20 +30056,23 @@ async function runCopilot(copilotPath, prompt, model) {
                 }
             }, 10_000);
         }, COPILOT_TIMEOUT_MS);
-        // Sanitize output to prevent workflow command injection (lines starting with ::)
-        const sanitize = (chunk) => chunk.replace(/^::/gm, '  ::');
+        // Sanitize complete output to prevent workflow command injection (lines starting with ::)
+        // We sanitize the full accumulated string rather than per-chunk to avoid
+        // chunk boundaries splitting a '::' sequence across two chunks.
+        const sanitize = (text) => text.replace(/^::/gm, '  ::');
         cp.stdout.on('data', (data) => {
-            const chunk = data.toString();
-            stdout += chunk;
-            process.stdout.write(sanitize(chunk));
+            stdout += data.toString();
         });
         cp.stderr.on('data', (data) => {
-            const chunk = data.toString();
-            stderr += chunk;
-            process.stderr.write(sanitize(chunk));
+            stderr += data.toString();
         });
         cp.on('close', (code) => {
             clearTimeout(timeoutId);
+            // Write sanitized output now that we have complete strings
+            if (stdout)
+                process.stdout.write(sanitize(stdout));
+            if (stderr)
+                process.stderr.write(sanitize(stderr));
             if (killTimerId)
                 clearTimeout(killTimerId);
             if (killed) {
@@ -30321,6 +30324,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.parseOutput = parseOutput;
 exports.formatAsMarkdown = formatAsMarkdown;
+exports.sanitizeForLog = sanitizeForLog;
 exports.setOutputs = setOutputs;
 const core = __importStar(__nccwpck_require__(7484));
 /**
@@ -30358,21 +30362,21 @@ function parseOutput(stdout) {
 }
 /**
  * Search through the output for a balanced JSON object that contains "entries".
- * Tries each '{' as a potential start, extracts the balanced object, and checks
- * if it parses as JSON with an "entries" key.
+ * Takes the LAST valid match — the model's final answer — not the first,
+ * since earlier matches may be echoed PR content.
  */
 function findEntriesJSON(str) {
     let searchFrom = 0;
+    let lastValid = null;
     while (searchFrom < str.length) {
         const braceIdx = str.indexOf('{', searchFrom);
         if (braceIdx === -1)
             break;
         const candidate = extractBalancedJSON(str, braceIdx);
         if (candidate && candidate.includes('"entries"')) {
-            // Verify it's valid JSON before returning
             try {
                 JSON.parse(candidate);
-                return candidate;
+                lastValid = candidate;
             }
             catch {
                 // Not valid JSON, keep searching
@@ -30380,7 +30384,7 @@ function findEntriesJSON(str) {
         }
         searchFrom = braceIdx + 1;
     }
-    return null;
+    return lastValid;
 }
 /**
  * Extract a balanced JSON object from a string starting at the given index.
@@ -30471,6 +30475,13 @@ function formatAsMarkdown(output) {
     return lines.join('\n').trim();
 }
 /**
+ * Sanitize text to prevent GitHub Actions workflow command injection.
+ * Lines starting with :: are interpreted as runner commands.
+ */
+function sanitizeForLog(text) {
+    return text.replace(/^::/gm, '  ::');
+}
+/**
  * Set the GitHub Action outputs.
  */
 function setOutputs(output) {
@@ -30484,7 +30495,7 @@ function setOutputs(output) {
     core.info(`⏭️  ${output.skippedPRs.length} PRs skipped`);
     if (markdown) {
         core.info('\n--- Release Notes ---');
-        core.info(markdown);
+        core.info(sanitizeForLog(markdown));
         core.info('--- End Release Notes ---');
     }
 }
@@ -30868,6 +30879,7 @@ async function findPRsViaMergeCommits(baseRef, headRef) {
             const num = parseInt(match[1], 10);
             if (!mergeSet.has(num)) {
                 prNumbers.push(num);
+                mergeSet.add(num);
             }
         }
     }
@@ -32880,4 +32892,3 @@ module.exports = parseParams
 /******/ 	
 /******/ })()
 ;
-//# sourceMappingURL=index.js.map

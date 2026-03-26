@@ -120,24 +120,26 @@ export async function runCopilot(
       }, 10_000)
     }, COPILOT_TIMEOUT_MS)
 
-    // Sanitize output to prevent workflow command injection (lines starting with ::)
-    const sanitize = (chunk: string): string =>
-      chunk.replace(/^::/gm, '  ::')
+    // Sanitize complete output to prevent workflow command injection (lines starting with ::)
+    // We sanitize the full accumulated string rather than per-chunk to avoid
+    // chunk boundaries splitting a '::' sequence across two chunks.
+    const sanitize = (text: string): string =>
+      text.replace(/^::/gm, '  ::')
 
     cp.stdout.on('data', (data: Buffer) => {
-      const chunk = data.toString()
-      stdout += chunk
-      process.stdout.write(sanitize(chunk))
+      stdout += data.toString()
     })
 
     cp.stderr.on('data', (data: Buffer) => {
-      const chunk = data.toString()
-      stderr += chunk
-      process.stderr.write(sanitize(chunk))
+      stderr += data.toString()
     })
 
     cp.on('close', (code: number | null) => {
       clearTimeout(timeoutId)
+
+      // Write sanitized output now that we have complete strings
+      if (stdout) process.stdout.write(sanitize(stdout))
+      if (stderr) process.stderr.write(sanitize(stderr))
       if (killTimerId) clearTimeout(killTimerId)
 
       if (killed) {

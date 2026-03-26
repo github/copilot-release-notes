@@ -142,6 +142,7 @@ async function findPRsViaMergeCommits(
       const num = parseInt(match[1], 10)
       if (!mergeSet.has(num)) {
         prNumbers.push(num)
+        mergeSet.add(num)
       }
     }
   }

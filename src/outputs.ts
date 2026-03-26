@@ -63,28 +63,28 @@ export function parseOutput(stdout: string): ParsedOutput {
 
 /**
  * Search through the output for a balanced JSON object that contains "entries".
- * Tries each '{' as a potential start, extracts the balanced object, and checks
- * if it parses as JSON with an "entries" key.
+ * Takes the LAST valid match — the model's final answer — not the first,
+ * since earlier matches may be echoed PR content.
  */
 function findEntriesJSON(str: string): string | null {
   let searchFrom = 0
+  let lastValid: string | null = null
   while (searchFrom < str.length) {
     const braceIdx = str.indexOf('{', searchFrom)
     if (braceIdx === -1) break
 
     const candidate = extractBalancedJSON(str, braceIdx)
     if (candidate && candidate.includes('"entries"')) {
-      // Verify it's valid JSON before returning
       try {
         JSON.parse(candidate)
-        return candidate
+        lastValid = candidate
       } catch {
         // Not valid JSON, keep searching
       }
     }
     searchFrom = braceIdx + 1
   }
-  return null
+  return lastValid
 }
 
 /**
@@ -190,6 +190,14 @@ export function formatAsMarkdown(output: ParsedOutput): string {
 }
 
 /**
+ * Sanitize text to prevent GitHub Actions workflow command injection.
+ * Lines starting with :: are interpreted as runner commands.
+ */
+export function sanitizeForLog(text: string): string {
+  return text.replace(/^::/gm, '  ::')
+}
+
+/**
  * Set the GitHub Action outputs.
  */
 export function setOutputs(output: ParsedOutput): void {
@@ -208,7 +216,7 @@ export function setOutputs(output: ParsedOutput): void {
 
   if (markdown) {
     core.info('\n--- Release Notes ---')
-    core.info(markdown)
+    core.info(sanitizeForLog(markdown))
     core.info('--- End Release Notes ---')
   }
 }
