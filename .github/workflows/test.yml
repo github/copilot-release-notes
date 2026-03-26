@@ -1,0 +1,52 @@
+name: Test Release Notes Generation
+
+on:
+  workflow_dispatch:
+    inputs:
+      base-ref:
+        description: 'Base ref (tag, branch, or SHA)'
+        required: true
+        default: 'release-3.5.6'
+      head-ref:
+        description: 'Head ref (tag, branch, or SHA)'
+        required: true
+        default: 'release-3.5.7-beta1'
+
+jobs:
+  test-generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout desktop/desktop
+        uses: actions/checkout@v4
+        with:
+          repository: desktop/desktop
+          ref: ${{ inputs.head-ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch base ref
+        run: git fetch origin ${{ inputs.base-ref }}
+
+      - name: Generate Release Notes
+        id: notes
+        uses: desktop/copilot-release-notes@main
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          head-ref: ${{ inputs.head-ref }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+
+      - name: Print release notes
+        run: |
+          echo "=== Release Notes ==="
+          echo "${{ steps.notes.outputs.release-notes }}"
+          echo ""
+          echo "=== JSON ==="
+          echo '${{ steps.notes.outputs.release-notes-json }}' | jq .
+          echo ""
+          echo "=== Skipped PRs ==="
+          echo '${{ steps.notes.outputs.skipped-prs }}' | jq .
+          echo ""
+          echo "=== Uncertain Entries ==="
+          echo '${{ steps.notes.outputs.uncertain-entries }}' | jq .
