@@ -129,7 +129,8 @@ The JSON must follow this exact structure:
     {
       "description": "One-sentence summary of what this PR changes",
       "pr": 1234,
-      "author": "username"
+      "author": "username",
+      "tag": "Optional category/tag from custom instructions"
     }
   ],
   "uncertainEntries": [
@@ -137,11 +138,23 @@ The JSON must follow this exact structure:
       "description": "Best-attempt summary needing human review",
       "pr": 5678,
       "author": "username",
-      "reason": "Why this entry is uncertain"
+      "reason": "Why this entry is uncertain",
+      "tag": "Optional category/tag"
     }
   ]
 }
 \`\`\`
+
+### Field Details
+
+- **description**: A concise summary of the change. Follow the writing style from
+  custom instructions if provided. Include author attribution in the description
+  itself if the custom instructions call for it (e.g. "by @author").
+- **pr**: The PR number (integer).
+- **author**: The GitHub username of the PR author (without the @ prefix).
+- **tag**: (Optional) A category or tag for grouping this entry. Only include if
+  custom instructions define categories or sections. Use the exact section heading
+  text from the instructions (e.g. "✨ Features", "🐛 Fixes").
 
 ### Important
 

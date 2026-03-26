@@ -102,13 +102,50 @@ function extractBalancedJSON(str: string): string | null {
 
 /**
  * Format release notes as markdown text.
+ * Groups entries by tag when tags are present.
  */
 export function formatAsMarkdown(output: ParsedOutput): string {
   const lines: string[] = []
 
-  for (const entry of output.entries) {
-    const prefix = entry.tag ? `${entry.tag} ` : ''
-    lines.push(`- ${prefix}${entry.description} (#${entry.pr})`)
+  const hasAnyTags = output.entries.some(e => e.tag)
+
+  if (hasAnyTags) {
+    // Group entries by tag, preserving insertion order
+    const groups = new Map<string, ReleaseNoteEntry[]>()
+    const untagged: ReleaseNoteEntry[] = []
+
+    for (const entry of output.entries) {
+      if (entry.tag) {
+        const existing = groups.get(entry.tag) || []
+        existing.push(entry)
+        groups.set(entry.tag, existing)
+      } else {
+        untagged.push(entry)
+      }
+    }
+
+    for (const [tag, entries] of groups) {
+      lines.push(`### ${tag}`)
+      lines.push('')
+      for (const entry of entries) {
+        lines.push(`- ${entry.description} (#${entry.pr})`)
+      }
+      lines.push('')
+    }
+
+    if (untagged.length > 0) {
+      lines.push('### Other')
+      lines.push('')
+      for (const entry of untagged) {
+        lines.push(`- ${entry.description} (#${entry.pr})`)
+      }
+      lines.push('')
+    }
+  } else {
+    // Flat list when no tags
+    for (const entry of output.entries) {
+      lines.push(`- ${entry.description} (#${entry.pr})`)
+    }
   }
 
   if (output.uncertainEntries.length > 0) {
@@ -122,7 +159,7 @@ export function formatAsMarkdown(output: ParsedOutput): string {
     }
   }
 
-  return lines.join('\n')
+  return lines.join('\n').trim()
 }
 
 /**

@@ -27,6 +27,7 @@ export interface ParsedOutput {
 export declare function parseOutput(stdout: string): ParsedOutput;
 /**
  * Format release notes as markdown text.
+ * Groups entries by tag when tags are present.
  */
 export declare function formatAsMarkdown(output: ParsedOutput): string;
 /**
