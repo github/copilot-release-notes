@@ -3,12 +3,14 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Release version (e.g., v1.2.0)'
+      bump:
+        description: 'Version bump type'
         required: true
-      base-ref:
-        description: 'Previous release tag (e.g., v1.1.0)'
-        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 jobs:
   release:
@@ -21,11 +23,32 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Determine versions
+        id: version
+        run: |
+          LATEST=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n 1)
+          if [ -z "$LATEST" ]; then
+            LATEST="v0.0.0"
+          fi
+          echo "previous=$LATEST" >> "$GITHUB_OUTPUT"
+
+          # Strip 'v' prefix, split, bump, reassemble
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST#v}"
+          case "${{ inputs.bump }}" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+          NEXT="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "next=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "major=v${MAJOR}" >> "$GITHUB_OUTPUT"
+          echo "Releasing $NEXT (previous: $LATEST)"
+
       - name: Generate release notes
         id: notes
         uses: github/copilot-release-notes@v1
         with:
-          base-ref: ${{ inputs.base-ref }}
+          base-ref: ${{ steps.version.outputs.previous }}
           head-ref: ${{ github.sha }}
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
@@ -33,13 +56,12 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.version }}
-          name: ${{ inputs.version }}
+          tag_name: ${{ steps.version.outputs.next }}
+          name: ${{ steps.version.outputs.next }}
           body: ${{ steps.notes.outputs.release-notes }}
           draft: true
 
       - name: Update major version tag
         run: |
-          MAJOR=$(echo "${{ inputs.version }}" | grep -oE '^v[0-9]+')
-          git tag -f "$MAJOR" "${{ inputs.version }}"
-          git push origin "$MAJOR" --force
+          git tag -f "${{ steps.version.outputs.major }}" "${{ steps.version.outputs.next }}"
+          git push origin "${{ steps.version.outputs.major }}" --force
