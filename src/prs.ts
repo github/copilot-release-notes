@@ -152,17 +152,17 @@ async function findPRsViaMergeCommits(
 
 /**
  * Get the token for GitHub repo API calls (fetching PRs, comparing commits).
- * Uses GITHUB_TOKEN which is automatically provided by GitHub Actions with
- * appropriate repo permissions. COPILOT_GITHUB_TOKEN is reserved for Copilot
- * CLI authentication and may not have repo access.
+ * Prefer GITHUB_TOKEN, which is automatically provided by GitHub Actions with
+ * appropriate repo permissions. Fall back to COPILOT_GITHUB_TOKEN if needed,
+ * but it may not have repo access.
  */
 function getApiToken(): string {
   const token =
     process.env.GITHUB_TOKEN || process.env.COPILOT_GITHUB_TOKEN
   if (!token) {
     throw new Error(
-      'GITHUB_TOKEN must be set for repo API calls. ' +
-        'COPILOT_GITHUB_TOKEN is used for Copilot CLI authentication only.'
+      'Either GITHUB_TOKEN or COPILOT_GITHUB_TOKEN must be set for repo API calls. ' +
+        'Prefer GITHUB_TOKEN; COPILOT_GITHUB_TOKEN may not have sufficient repo permissions.'
     )
   }
   return token
