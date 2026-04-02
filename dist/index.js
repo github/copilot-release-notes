@@ -1,4 +1,4 @@
-/******/ (() => { // webpackBootstrap
+require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
 /***/ 4914:
@@ -36210,13 +36210,16 @@ async function findPRsViaMergeCommits(baseRef, headRef) {
     return prNumbers;
 }
 /**
- * Get the best available token for GitHub API calls.
- * Prefers COPILOT_GITHUB_TOKEN (PAT with broader access) over GITHUB_TOKEN.
+ * Get the token for GitHub repo API calls (fetching PRs, comparing commits).
+ * Prefer GITHUB_TOKEN, which is automatically provided by GitHub Actions with
+ * appropriate repo permissions. Fall back to COPILOT_GITHUB_TOKEN if needed,
+ * but it may not have repo access.
  */
 function getApiToken() {
-    const token = process.env.COPILOT_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
+    const token = process.env.GITHUB_TOKEN || process.env.COPILOT_GITHUB_TOKEN;
     if (!token) {
-        throw new Error('Either COPILOT_GITHUB_TOKEN or GITHUB_TOKEN must be set for API calls');
+        throw new Error('Either GITHUB_TOKEN or COPILOT_GITHUB_TOKEN must be set for repo API calls. ' +
+            'Prefer GITHUB_TOKEN; COPILOT_GITHUB_TOKEN may not have sufficient repo permissions.');
     }
     return token;
 }
@@ -36615,3 +36618,4 @@ module.exports = require("util");
 /******/ 	
 /******/ })()
 ;
+//# sourceMappingURL=index.js.map
