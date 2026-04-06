@@ -12,6 +12,10 @@ on:
         required: true
         default: 'v2.89.0'
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   test-cli-generic:
     runs-on: ubuntu-latest
