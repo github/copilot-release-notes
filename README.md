@@ -39,7 +39,6 @@ This project is under **active development** and maintained by the GitHub CLI & 
 This action requires a `COPILOT_GITHUB_TOKEN` — a GitHub fine-grained personal access token with the **"Copilot Requests: Read"** permission. The token owner must have an active GitHub Copilot license.
 
 1. Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with:
-   - **Resource owner:** Your organization
    - **Permissions:** `Copilot Requests: Read`
 2. Add it as a repository or organization secret named `COPILOT_GITHUB_TOKEN`
 3. Pass it via `env` in your workflow (see examples below)
