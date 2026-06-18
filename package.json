@@ -28,7 +28,8 @@
   },
   "overrides": {
     "undici": "^6.24.1",
-    "handlebars": "^4.7.9"
+    "handlebars": "^4.7.9",
+    "js-yaml": "^4.2.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
