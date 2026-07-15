@@ -27,7 +27,7 @@
     "@actions/io": "^1.1.3"
   },
   "overrides": {
-    "undici": "^6.24.1",
+    "undici": "^6.27.0",
     "handlebars": "^4.7.9",
     "js-yaml": "^4.2.0"
   },
