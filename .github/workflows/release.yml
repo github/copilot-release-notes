@@ -12,6 +12,11 @@ on:
           - patch
           - minor
           - major
+      draft:
+        description: 'Create the release as a draft'
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   release:
@@ -62,6 +67,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.next }}
           name: ${{ steps.version.outputs.next }}
           body: ${{ steps.notes.outputs.release-notes }}
+          draft: ${{ inputs.draft }}
           target_commitish: ${{ github.sha }}
 
       - name: Update major version tag
