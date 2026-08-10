@@ -1,0 +1,39 @@
+name: End-to-end
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out test fixture
+        uses: actions/checkout@v4
+        with:
+          ref: 3ff4cb51f2cedc0a6415b31966353dd352d0d426
+          fetch-depth: 0
+
+      - name: Check out action under test
+        uses: actions/checkout@v4
+        with:
+          path: _action
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Generate release notes
+        id: notes
+        uses: ./_action
+        with:
+          base-ref: ba77482a882ac536f44f60b9adaffe40149866e5
+          head-ref: 3ff4cb51f2cedc0a6415b31966353dd352d0d426
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Validate output
+        env:
+          NOTES_JSON: ${{ steps.notes.outputs.release-notes-json }}
+        run: jq -e 'type == "array" and length > 0' <<<"$NOTES_JSON"
