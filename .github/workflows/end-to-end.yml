@@ -4,6 +4,7 @@ on:
   pull_request:
 
 permissions:
+  copilot-requests: write
   contents: read
   pull-requests: read
 
