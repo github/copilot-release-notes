@@ -20,6 +20,7 @@ jobs:
     outputs:
       base-ref: ${{ steps.release.outputs.base-ref }}
       bump: ${{ steps.release.outputs.bump }}
+      draft: ${{ steps.release.outputs.draft }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,9 +58,11 @@ jobs:
               ;;
             patch)
               echo "bump=patch" >> "$GITHUB_OUTPUT"
+              echo "draft=false" >> "$GITHUB_OUTPUT"
               ;;
             minor)
               echo "bump=minor" >> "$GITHUB_OUTPUT"
+              echo "draft=true" >> "$GITHUB_OUTPUT"
               ;;
             stale-bundle)
               echo "::error::$REASON"
@@ -73,17 +76,10 @@ jobs:
 
   release:
     needs: classify
-    if: needs.classify.result == 'success' && needs.classify.outputs.bump == 'patch'
+    if: needs.classify.result == 'success' && needs.classify.outputs.bump != ''
     uses: ./.github/workflows/release.yml
     with:
       automatic: true
       base-ref: ${{ needs.classify.outputs.base-ref }}
       bump: ${{ needs.classify.outputs.bump }}
-
-  update-draft:
-    needs: classify
-    if: needs.classify.result == 'success' && needs.classify.outputs.bump == 'minor'
-    uses: ./.github/workflows/update-draft-release.yml
-    with:
-      base-ref: ${{ needs.classify.outputs.base-ref }}
-      bump: ${{ needs.classify.outputs.bump }}
+      draft: ${{ fromJSON(needs.classify.outputs.draft) }}

@@ -4,18 +4,18 @@ on:
   workflow_call:
     inputs:
       automatic:
-        description: 'Whether this release was selected by the automatic policy'
         required: false
         default: false
         type: boolean
       base-ref:
-        description: 'Expected latest stable tag for an automatic release'
         required: false
         type: string
       bump:
-        description: 'Version bump type'
         required: true
         type: string
+      draft:
+        required: true
+        type: boolean
   workflow_dispatch:
     inputs:
       bump:
@@ -23,10 +23,12 @@ on:
         required: true
         default: 'patch'
         type: choice
-        options:
-          - patch
-          - minor
-          - major
+        options: [patch, minor, major]
+      draft:
+        description: 'Create the release as a draft'
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: release-${{ github.repository }}
@@ -39,7 +41,6 @@ jobs:
       copilot-requests: write
       contents: write
       pull-requests: read
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,10 +49,29 @@ jobs:
       - name: Determine versions
         id: version
         env:
-          BASE_REF: ${{ inputs.base-ref }}
           BUMP: ${{ inputs.bump }}
+          EXPECTED_BASE: ${{ inputs.base-ref }}
         run: |
-          .github/scripts/release-version.sh "$BUMP" "$BASE_REF"
+          set -euo pipefail
+          LATEST=$(git tag --list | awk '/^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/' | sort -V | tail -1)
+          LATEST=${LATEST:-v0.0.0}
+          if [ -n "$EXPECTED_BASE" ] && [ "$LATEST" != "$EXPECTED_BASE" ]; then
+            echo "::error::Latest stable release advanced to $LATEST; retry automation"
+            exit 1
+          fi
+          case "$BUMP" in
+            major|minor|patch) ;;
+            *) echo "::error::Invalid version bump: $BUMP"; exit 1 ;;
+          esac
+          IFS=. read -r MAJOR MINOR PATCH <<< "${LATEST#v}"
+          case "$BUMP" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+          echo "previous=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "next=v$MAJOR.$MINOR.$PATCH" >> "$GITHUB_OUTPUT"
+          echo "major=v$MAJOR" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes
         id: notes
@@ -62,15 +82,53 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Publish release
+      - name: Create or update release
         env:
           AUTOMATIC: ${{ inputs.automatic || false }}
+          DRAFT: ${{ inputs.draft }}
           GH_TOKEN: ${{ github.token }}
+          MAJOR: ${{ steps.version.outputs.major }}
+          NEXT: ${{ steps.version.outputs.next }}
           NOTES: ${{ steps.notes.outputs.release-notes }}
         run: |
-          printf '%s\n' "$NOTES" > "$RUNNER_TEMP/release-notes.md"
-          .github/scripts/publish-release.sh \
-            "${{ steps.version.outputs.next }}" \
-            "${{ steps.version.outputs.major }}" \
-            "$RUNNER_TEMP/release-notes.md" \
-            "$AUTOMATIC"
+          set -euo pipefail
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          printf '%s\n' "$NOTES" > "$NOTES_FILE"
+          gh release list --limit 100 --json tagName,isDraft,isPrerelease > "$RUNNER_TEMP/releases.json"
+          MATCH_DRAFT=$(jq -r --arg tag "$NEXT" '.[] | select(.tagName == $tag) | .isDraft' "$RUNNER_TEMP/releases.json")
+
+          if [ "$DRAFT" = "true" ]; then
+            OTHER_DRAFTS=$(jq -r --arg tag "$NEXT" \
+              '.[] | select(.isDraft and .tagName != $tag and (.tagName | test("^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"))) | .tagName' \
+              "$RUNNER_TEMP/releases.json")
+            if [ -n "$OTHER_DRAFTS" ]; then
+              echo "::error::Resolve conflicting draft release(s): ${OTHER_DRAFTS//$'\n'/, }"
+              exit 1
+            fi
+          elif [ "$AUTOMATIC" = "true" ] && [ "$MATCH_DRAFT" = "true" ]; then
+            echo "::error::Automatic patch release refuses to publish existing draft $NEXT"
+            exit 1
+          fi
+
+          if [ "$MATCH_DRAFT" = "true" ]; then
+            gh release edit "$NEXT" --title "$NEXT" --notes-file "$NOTES_FILE" \
+              --target "$GITHUB_SHA" --draft="$DRAFT"
+          elif [ -z "$MATCH_DRAFT" ]; then
+            DRAFT_FLAG=()
+            [ "$DRAFT" = "true" ] && DRAFT_FLAG=(--draft)
+            gh release create "$NEXT" --title "$NEXT" --notes-file "$NOTES_FILE" \
+              --target "$GITHUB_SHA" "${DRAFT_FLAG[@]}"
+          else
+            echo "$NEXT is already published; reconciling its major tag"
+          fi
+
+          if [ "$DRAFT" != "true" ]; then
+            git fetch --force --tags origin
+            HIGHEST=$(gh release list --limit 100 --exclude-drafts --exclude-pre-releases \
+              --json tagName --jq '.[].tagName' |
+              awk -v major="${MAJOR#v}" '$0 ~ ("^v" major "\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$")' |
+              sort -V | tail -1)
+            [ -n "$HIGHEST" ] || { echo "::error::No stable release found for $MAJOR"; exit 1; }
+            git tag -f "$MAJOR" "${HIGHEST}^{commit}"
+            git push origin "refs/tags/$MAJOR" --force
+          fi
