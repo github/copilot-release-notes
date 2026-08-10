@@ -1,0 +1,89 @@
+name: Automatic release
+
+on:
+  schedule:
+    - cron: '17 13 * * *'
+  workflow_dispatch:
+
+# Releases made with GITHUB_TOKEN do not recursively trigger push/release workflows.
+# The daily schedule invokes the reusable release workflow directly.
+permissions:
+  copilot-requests: write
+  contents: write
+  pull-requests: read
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      base-ref: ${{ steps.release.outputs.base-ref }}
+      bump: ${{ steps.release.outputs.bump }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify changes
+        id: policy
+        run: |
+          set -euo pipefail
+          LATEST=$(
+            git tag --list |
+              awk '/^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/' |
+              sort -V |
+              tail -n 1
+          )
+          if [ -z "$LATEST" ]; then
+            echo "::error::Automatic releases require an existing stable semver tag"
+            exit 1
+          fi
+          echo "base-ref=$LATEST" >> "$GITHUB_OUTPUT"
+          node .github/scripts/release-policy.cjs "$LATEST" "$GITHUB_SHA"
+
+      - name: Select release behavior
+        id: release
+        env:
+          BASE_REF: ${{ steps.policy.outputs.base-ref }}
+          CLASSIFICATION: ${{ steps.policy.outputs.classification }}
+          REASON: ${{ steps.policy.outputs.reason }}
+        run: |
+          set -euo pipefail
+          echo "$CLASSIFICATION: $REASON"
+          echo "base-ref=$BASE_REF" >> "$GITHUB_OUTPUT"
+          case "$CLASSIFICATION" in
+            none)
+              ;;
+            patch)
+              echo "bump=patch" >> "$GITHUB_OUTPUT"
+              ;;
+            minor)
+              echo "bump=minor" >> "$GITHUB_OUTPUT"
+              ;;
+            stale-bundle)
+              echo "::error::$REASON"
+              exit 1
+              ;;
+            *)
+              echo "::error::Unexpected release classification: $CLASSIFICATION"
+              exit 1
+              ;;
+          esac
+
+  release:
+    needs: classify
+    if: needs.classify.result == 'success' && needs.classify.outputs.bump == 'patch'
+    uses: ./.github/workflows/release.yml
+    with:
+      automatic: true
+      base-ref: ${{ needs.classify.outputs.base-ref }}
+      bump: ${{ needs.classify.outputs.bump }}
+
+  update-draft:
+    needs: classify
+    if: needs.classify.result == 'success' && needs.classify.outputs.bump == 'minor'
+    uses: ./.github/workflows/update-draft-release.yml
+    with:
+      base-ref: ${{ needs.classify.outputs.base-ref }}
+      bump: ${{ needs.classify.outputs.bump }}

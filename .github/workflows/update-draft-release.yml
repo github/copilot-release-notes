@@ -1,13 +1,8 @@
-name: Release
+name: Update draft release
 
 on:
   workflow_call:
     inputs:
-      automatic:
-        description: 'Whether this release was selected by the automatic policy'
-        required: false
-        default: false
-        type: boolean
       base-ref:
         description: 'Expected latest stable tag for an automatic release'
         required: false
@@ -21,7 +16,7 @@ on:
       bump:
         description: 'Version bump type'
         required: true
-        default: 'patch'
+        default: 'minor'
         type: choice
         options:
           - patch
@@ -33,7 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  update:
     runs-on: ubuntu-latest
     permissions:
       copilot-requests: write
@@ -62,15 +57,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Publish release
+      - name: Create or update draft release
         env:
-          AUTOMATIC: ${{ inputs.automatic || false }}
           GH_TOKEN: ${{ github.token }}
           NOTES: ${{ steps.notes.outputs.release-notes }}
         run: |
           printf '%s\n' "$NOTES" > "$RUNNER_TEMP/release-notes.md"
-          .github/scripts/publish-release.sh \
+          .github/scripts/update-draft-release.sh \
             "${{ steps.version.outputs.next }}" \
-            "${{ steps.version.outputs.major }}" \
-            "$RUNNER_TEMP/release-notes.md" \
-            "$AUTOMATIC"
+            "$RUNNER_TEMP/release-notes.md"
