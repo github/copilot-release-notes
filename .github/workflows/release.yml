@@ -12,11 +12,17 @@ on:
           - patch
           - minor
           - major
+      draft:
+        description: 'Create the release as a draft'
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
+      copilot-requests: write
       contents: write
       pull-requests: read
 
@@ -54,7 +60,6 @@ jobs:
           head-ref: ${{ github.sha }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -62,7 +67,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.next }}
           name: ${{ steps.version.outputs.next }}
           body: ${{ steps.notes.outputs.release-notes }}
-          draft: true
+          draft: ${{ inputs.draft }}
           target_commitish: ${{ github.sha }}
 
       - name: Update major version tag
