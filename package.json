@@ -29,7 +29,10 @@
   "overrides": {
     "undici": "^6.29.1",
     "handlebars": "^4.7.10",
-    "js-yaml": "4.3.2"
+    "js-yaml": "4.3.2",
+    "glob@^10": {
+      "minimatch": "^11.0.1"
+    }
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
